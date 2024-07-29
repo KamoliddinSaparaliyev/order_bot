@@ -1,0 +1,33 @@
+{
+    "name": "bmu_bot",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "dev": "nodemon index.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@telegraf/session": "^2.0.0-beta.7",
+        "base64url": "^3.0.1",
+        "dotenv": "^16.4.5",
+        "express": "^4.19.2",
+        "mongodb": "^6.8.0",
+        "mongoose": "^8.5.1",
+        "telegraf": "^4.16.3"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.4",
+        "prettier": "^3.3.3"
+    },
+    "prettier": {
+        "singleQuote": true,
+        "bracketSpacing": true,
+        "trailingComma": "es5",
+        "tabWidth": 4,
+        "semi": false
+    }
+}
