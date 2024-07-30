@@ -116,20 +116,66 @@ class OrderController {
         return { orders: orderList.join(',\n'), total }
     }
 
+    async editOrders(userId) {
+        const editOrders = await Order.find({
+            telegramId: userId,
+            status: 'waiting',
+        }).populate('meals.meal')
+
+        if (editOrders.length === 0) {
+            return 'Siz hali hech narsa buyurtma qilmagansiz'
+        }
+
+        const total = editOrders.reduce(
+            (acc, { meal: m, count }) => acc + m.price * count,
+            0
+        )
+
+        const orderList = editOrders.map(
+            ({ meal: m, count }) =>
+                m.name + ' - ' + count + 'x' + ' - ' + count * m.price + " so'm"
+        )
+
+        return { orders: orderList.join(',\n'), total }
+    }
+
     async userOrder(userId) {
         let total = 0
         let orderList = ''
         // получение заказа из БД
         const orders = await Order.find({
             telegramId: userId,
-            status: 'waiting',
-        }).populate('meals.meal')
+            status: 'done',
+        }).populate('meals.meal user')
 
         if (orders.length === 0) {
             return 'Bu foydalanuvchining buyurtmasi topilmadi'
         }
 
-        for (const order of orders) {
+        // for (const order of orders) {
+        //     const totalOne = order.meals.reduce(
+        //         (acc, { meal: m, count }) => acc + m.price * count,
+        //         0
+        //     )
+
+        //     total += totalOne
+
+        //     // формирование списка заказа
+        //     const orderListOne = order.meals.map(
+        //         ({ meal: m, count }) =>
+        //             m.name +
+        //             ' - ' +
+        //             count +
+        //             'x' +
+        //             ' - ' +
+        //             count * m.price +
+        //             " so'm \n"
+        //     )
+
+        //     orderList += orderListOne.join('')
+        // }
+
+        orders.map((order, i) => {
             const totalOne = order.meals.reduce(
                 (acc, { meal: m, count }) => acc + m.price * count,
                 0
@@ -138,21 +184,16 @@ class OrderController {
             total += totalOne
 
             // формирование списка заказа
-            const orderListOne = order.meals.map(
-                ({ meal: m, count }) =>
-                    m.name +
-                    ' - ' +
-                    count +
-                    'x' +
-                    ' - ' +
-                    count * m.price +
-                    " so'm"
-            )
+            let orderListOne = `Buyurtma №${i + 1}\n`
 
-            orderList += orderListOne.join(',\n')
-        }
+            order.meals.forEach(({ meal: m, count }) => {
+                orderListOne += `${m.name} *${count}x* - *${count * m.price}* so'm\n`
+            })
 
-        return { orders: orderList, total }
+            orderList += orderListOne
+        })
+
+        return { orders: orderList, total, user: orders[0].user }
     }
 
     async listAllOrders() {
@@ -170,14 +211,13 @@ class OrderController {
         let mealCount = {}
         let total = 0
         let userCount = {}
-        let userOrders = {}
 
         for (let i = 0; i < orders.length; i++) {
             const { user, meals } = orders[i]
             const userKey =
                 user.user_id + '_' + user.user_name + '_' + user.user_phone
 
-            const oneOrder = orders[i].meals.reduce(
+            const oneOrder = meals.reduce(
                 (acc, { meal: m, count }) => acc + m.price * count,
                 0
             )
@@ -207,8 +247,8 @@ class OrderController {
 
             total += oneOrder
 
-            for (let j = 0; j < orders[i].meals.length; j++) {
-                const { meal, count } = orders[i].meals[j]
+            for (let j = 0; j < meals.length; j++) {
+                const { meal, count } = meals[j]
                 if (mealCount[meal._id + '_' + meal.name + '_' + meal.price]) {
                     mealCount[meal._id + '_' + meal.name + '_' + meal.price] +=
                         count
@@ -219,7 +259,7 @@ class OrderController {
             }
 
             if (userCount[userKey]) {
-                userCount[userKey] = +1
+                userCount[userKey] += 1
             } else {
                 userCount[userKey] = 1
             }
@@ -230,37 +270,32 @@ class OrderController {
             // Parse the price to integer
             price = parseInt(price)
 
-            orderList +=
-                name +
-                ' - ' +
-                mealCount[key] +
-                'x\n' +
-                ' - ' +
-                mealCount[key] * price +
-                " so'm\n"
+            orderList += `${name} *${mealCount[key]}*x - *${mealCount[key] * price}* so'm\n`
         })
 
         // inline_keyboard users
         const usersKeyboard = Object.keys(userCount).map((key) => {
             let [id, name, phone] = key.split('_')
-            return {
-                text:
-                    renderName(name, phone) +
-                    +' - ' +
-                    userCount[key] +
-                    ' ta buyurtma',
-                callback_data: JSON.stringify({
-                    t: 'userOrder',
-                    u: id,
-                }),
-            }
+            return [
+                {
+                    text:
+                        renderName(name, phone) +
+                        ' - ' +
+                        userCount[key] +
+                        ' ta buyurtma',
+                    callback_data: JSON.stringify({
+                        t: 'userOrder',
+                        u: id,
+                    }),
+                },
+            ]
         })
 
         function renderName(name, phone) {
-            if (name.length > 10) {
+            if (name.length > 5) {
                 return name
             } else {
-                return name + ' - ' + phone
+                return name + ' (' + phone + ')'
             }
         }
 

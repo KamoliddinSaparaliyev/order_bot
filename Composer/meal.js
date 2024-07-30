@@ -60,6 +60,11 @@ composer.on('callback_query', async (ctx) => {
                 const orders = await orderController.orderList(ctx.from.id)
                 ctx.reply(orders)
                 break
+
+            case 'orders':
+                const editOrders = await orderController.orderList(ctx.from.id)
+                ctx.reply(orders)
+                break
             case 'applyOrder':
                 const resultOrder = await orderController.applyOrder(
                     ctx.from.id
@@ -114,6 +119,20 @@ composer.on('callback_query', async (ctx) => {
                                 ],
                             ],
                         },
+                    }
+                )
+                break
+            case 'userOrder':
+                const {
+                    user,
+                    orders: userOrders,
+                    total: userTotal,
+                } = await orderController.userOrder(data.u)
+                const serviceCharge = userTotal * 0.1
+                ctx.reply(
+                    `*${user.user_name} ${user?.user_phone}* buyurtmalar:\n\n${userOrders}\n\nJami: *${userTotal}* so'm\nXizmat haqqi(10%) bilan: *${userTotal + serviceCharge}* so'm`,
+                    {
+                        parse_mode: 'Markdown',
                     }
                 )
                 break
