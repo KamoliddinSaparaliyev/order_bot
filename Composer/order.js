@@ -7,6 +7,7 @@ const composer = new Composer()
 composer.hears('📦 Buyurtmalarim', async (ctx) => {
     const { meals, total, users } = await orderController.listOrders({
         telegramId: ctx.from.id.toString(),
+        status: 'waiting',
     })
 
     const serviceCharge = total * 0.1
@@ -27,6 +28,7 @@ composer.hears('📦 Buyurtmalarim', async (ctx) => {
         `*${user.user_name} ${user?.user_phone}* buyurtmalar:\n\n${userOrders}\n\nJami: *${total}* so'm\nXizmat haqqi(10%) bilan: *${total + serviceCharge}* so'm`,
         {
             parse_mode: 'Markdown',
+            reply_markup: orderKeyboard,
         }
     )
 })

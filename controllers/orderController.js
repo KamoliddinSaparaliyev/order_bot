@@ -99,6 +99,7 @@ class OrderController {
         return Order.findOne({
             telegramId: userId,
             is_deleted: false,
+            status: 'waiting',
         }).populate('meals.meal user')
     }
 
