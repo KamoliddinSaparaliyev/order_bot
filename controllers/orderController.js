@@ -1,3 +1,4 @@
+const cron = require('node-cron')
 const Order = require('../models/order.model')
 
 class OrderController {
@@ -5,7 +6,11 @@ class OrderController {
     async addMeal(userId, mealId, count) {
         try {
             // Define the query to find the order
-            const query = { telegramId: userId, status: 'waiting' }
+            const query = {
+                telegramId: userId,
+                is_deleted: false,
+                status: 'waiting',
+            }
             let order = await Order.findOne(query)
 
             if (order) {
@@ -15,9 +20,12 @@ class OrderController {
                 })
 
                 if (mealOrder) {
+                    if (mealOrder.meals[0].count === count) {
+                        return 'Siz bu taomni buyurtirgansiz'
+                    }
                     await Order.updateOne(
                         { ...query, 'meals.meal': mealId },
-                        { $inc: { 'meals.$.count': count } }
+                        { $set: { 'meals.$.count': count } }
                     )
                     return "Buyurtmangizga qo'shilgan taomni sonini o'zgartirdingiz"
                 } else {
@@ -44,7 +52,8 @@ class OrderController {
         // получение заказа из БД
         const order = await Order.exists({
             telegramId: userId,
-            served: 'waiting',
+            is_deleted: false,
+            status: 'waiting',
             meals: { $elemMatch: { meal: mealId } },
         })
 
@@ -52,7 +61,7 @@ class OrderController {
         if (order) {
             // удаление блюда из заказа
             await Order.updateOne(
-                { telegramId: userId, served: 'waiting' },
+                { telegramId: userId, is_deleted: false, status: 'waiting' },
                 { $pull: { meals: { meal: mealId } } }
             )
             // сохранение изменений
@@ -66,15 +75,38 @@ class OrderController {
         // сохранение изменений
     }
 
+    async deleteOrder(userId) {
+        // получение заказа из БД
+        const order = await Order.findOne({
+            telegramId: userId,
+            is_deleted: false,
+            status: 'waiting',
+        })
+
+        // проверка на наличие заказа
+        if (order) {
+            // удаление заказа
+            order.is_deleted = true
+            order.save()
+            return 'Buyurtmangiz bekor qilindi'
+        } else {
+            return 'Siz hali hech narsa buyurtma qilmagansiz'
+        }
+    }
+
     // поиск заказа по id пользователя
     async findOrderById(userId) {
-        return Order.findOne({ telegramId: userId, served: 'waiting' })
+        return Order.findOne({
+            telegramId: userId,
+            is_deleted: false,
+        }).populate('meals.meal user')
     }
 
     // подтверждение заказа
     async applyOrder(userId) {
         const order = await Order.findOne({
             telegramId: userId,
+            is_deleted: false,
             status: 'waiting',
         })
         let msg = 'Siz hali hech narsa buyurtma qilmagansiz'
@@ -94,6 +126,7 @@ class OrderController {
         // получение заказа из БД
         const order = await Order.findOne({
             telegramId: userId,
+            is_deleted: false,
             status: 'waiting',
         }).populate('meals.meal')
         const msg = 'Siz hali hech narsa buyurtma qilmagansiz'
@@ -101,11 +134,38 @@ class OrderController {
         if (!order) {
             return msg
         }
-
-        const total = order.meals.reduce(
-            (acc, { meal: m, count }) => acc + m.price * count,
-            0
-        )
+        //
+        const total = await Order.aggregate([
+            {
+                $match: {
+                    status: 'done',
+                    is_deleted: false,
+                    telegramId: userId,
+                },
+            },
+            {
+                $unwind: '$meals',
+            },
+            {
+                $lookup: {
+                    from: 'meals',
+                    localField: 'meals.meal',
+                    foreignField: '_id',
+                    as: 'meal',
+                },
+            },
+            {
+                $unwind: '$meal',
+            },
+            {
+                $group: {
+                    _id: null,
+                    total: {
+                        $sum: { $multiply: ['$meals.count', '$meal.price'] },
+                    },
+                },
+            },
+        ])
 
         // формирование списка заказа
         const orderList = order.meals.map(
@@ -116,190 +176,114 @@ class OrderController {
         return { orders: orderList.join(',\n'), total }
     }
 
-    async editOrders(userId) {
-        const editOrders = await Order.find({
-            telegramId: userId,
-            status: 'waiting',
-        }).populate('meals.meal')
+    async listOrders(query = {}) {
+        const queryMatch = { status: 'done', is_deleted: false, ...query }
 
-        if (editOrders.length === 0) {
-            return 'Siz hali hech narsa buyurtma qilmagansiz'
-        }
-
-        const total = editOrders.reduce(
-            (acc, { meal: m, count }) => acc + m.price * count,
-            0
-        )
-
-        const orderList = editOrders.map(
-            ({ meal: m, count }) =>
-                m.name + ' - ' + count + 'x' + ' - ' + count * m.price + " so'm"
-        )
-
-        return { orders: orderList.join(',\n'), total }
-    }
-
-    async userOrder(userId) {
-        let total = 0
-        let orderList = ''
-        // получение заказа из БД
-        const orders = await Order.find({
-            telegramId: userId,
-            status: 'done',
-        }).populate('meals.meal user')
-
-        if (orders.length === 0) {
-            return 'Bu foydalanuvchining buyurtmasi topilmadi'
-        }
-
-        // for (const order of orders) {
-        //     const totalOne = order.meals.reduce(
-        //         (acc, { meal: m, count }) => acc + m.price * count,
-        //         0
-        //     )
-
-        //     total += totalOne
-
-        //     // формирование списка заказа
-        //     const orderListOne = order.meals.map(
-        //         ({ meal: m, count }) =>
-        //             m.name +
-        //             ' - ' +
-        //             count +
-        //             'x' +
-        //             ' - ' +
-        //             count * m.price +
-        //             " so'm \n"
-        //     )
-
-        //     orderList += orderListOne.join('')
-        // }
-
-        orders.map((order, i) => {
-            const totalOne = order.meals.reduce(
-                (acc, { meal: m, count }) => acc + m.price * count,
-                0
-            )
-
-            total += totalOne
-
-            // формирование списка заказа
-            let orderListOne = `Buyurtma №${i + 1}\n`
-
-            order.meals.forEach(({ meal: m, count }) => {
-                orderListOne += `${m.name} *${count}x* - *${count * m.price}* so'm\n`
-            })
-
-            orderList += orderListOne
-        })
-
-        return { orders: orderList, total, user: orders[0].user }
-    }
-
-    async listAllOrders() {
-        const orders = await Order.find({ status: 'done' }).populate([
+        const users = await Order.aggregate([
             {
-                path: 'meals.meal',
-                select: 'name price',
+                $match: queryMatch,
             },
             {
-                path: 'user',
+                $lookup: {
+                    from: 'users',
+                    localField: 'telegramId',
+                    foreignField: 'user_id',
+                    as: 'user',
+                },
+            },
+            {
+                $unwind: '$user',
+            },
+            {
+                $group: {
+                    _id: {
+                        user_id: '$telegramId',
+                        user_name: '$user.user_name',
+                        user_phone: '$user.user_phone',
+                    },
+                    count: { $sum: 1 },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    user_id: '$_id.user_id',
+                    user_name: '$_id.user_name',
+                    user_phone: '$_id.user_phone',
+                    count: 1,
+                },
             },
         ])
 
-        let orderList = ''
-        let mealCount = {}
-        let total = 0
-        let userCount = {}
-
-        for (let i = 0; i < orders.length; i++) {
-            const { user, meals } = orders[i]
-            const userKey =
-                user.user_id + '_' + user.user_name + '_' + user.user_phone
-
-            const oneOrder = meals.reduce(
-                (acc, { meal: m, count }) => acc + m.price * count,
-                0
-            )
-            const userOrder = {}
-
-            for (let j = 0; j < orders[i].length; j++) {
-                const { user, meals } = orders[i]
-
-                meals.forEach((meal) => {
-                    const key =
-                        user._id +
-                        '_' +
-                        user.name +
-                        '_' +
-                        meal._id +
-                        '_' +
-                        meal.name
-
-                    if (userOrder[key]) {
-                        userOrder[key] += meal.count
-                    } else {
-                        userOrder[key] = meal.count
-                    }
-                })
-                console.log(userOrder)
-            }
-
-            total += oneOrder
-
-            for (let j = 0; j < meals.length; j++) {
-                const { meal, count } = meals[j]
-                if (mealCount[meal._id + '_' + meal.name + '_' + meal.price]) {
-                    mealCount[meal._id + '_' + meal.name + '_' + meal.price] +=
-                        count
-                } else {
-                    mealCount[meal._id + '_' + meal.name + '_' + meal.price] =
-                        count
-                }
-            }
-
-            if (userCount[userKey]) {
-                userCount[userKey] += 1
-            } else {
-                userCount[userKey] = 1
-            }
-        }
-
-        Object.keys(mealCount).forEach((key) => {
-            let [id, name, price] = key.split('_')
-            // Parse the price to integer
-            price = parseInt(price)
-
-            orderList += `${name} *${mealCount[key]}*x - *${mealCount[key] * price}* so'm\n`
-        })
-
-        // inline_keyboard users
-        const usersKeyboard = Object.keys(userCount).map((key) => {
-            let [id, name, phone] = key.split('_')
-            return [
-                {
-                    text:
-                        renderName(name, phone) +
-                        ' - ' +
-                        userCount[key] +
-                        ' ta buyurtma',
-                    callback_data: JSON.stringify({
-                        t: 'userOrder',
-                        u: id,
-                    }),
+        const orders = await Order.aggregate([
+            {
+                $match: queryMatch,
+            },
+            {
+                $unwind: '$meals',
+            },
+            {
+                $lookup: {
+                    from: 'meals',
+                    localField: 'meals.meal',
+                    foreignField: '_id',
+                    as: 'meal',
                 },
-            ]
-        })
+            },
+            {
+                $unwind: '$meal',
+            },
+            {
+                $group: {
+                    _id: {
+                        mealId: '$meals.meal',
+                        name: '$meal.name',
+                    },
+                    total: {
+                        $sum: { $multiply: ['$meals.count', '$meal.price'] },
+                    },
+                    count: { $sum: '$meals.count' },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    mealId: '$_id.mealId',
+                    name: '$_id.name',
+                    total: 1,
+                    count: 1,
+                },
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalSum: { $sum: '$total' },
+                    meals: {
+                        $push: {
+                            mealId: '$mealId',
+                            name: '$name',
+                            total: '$total',
+                            count: '$count',
+                        },
+                    },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    totalSum: 1,
+                    meals: 1,
+                },
+            },
+        ])
 
-        function renderName(name, phone) {
-            if (name.length > 5) {
-                return name
-            } else {
-                return name + ' (' + phone + ')'
-            }
-        }
+        return { total: orders[0].totalSum, meals: orders[0].meals, users }
+    }
 
-        return { orders: orderList, total, usersKeyboard }
+    // update every 24 hours to delete orders older than 24 hours with node-cron
+    async deleteOldOrders() {
+        //  use soft delete to prevent
+        await Order.updateMany({ is_deleted: false }, { is_deleted: true })
     }
 }
 

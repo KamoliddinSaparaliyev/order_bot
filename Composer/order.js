@@ -1,28 +1,34 @@
-const {Composer} = require('telegraf');
-const orderController = require('../controllers/orderController');
-const { orderKeyboard } = require('../keyboard');
-
+const { Composer } = require('telegraf')
+const orderController = require('../controllers/orderController')
+const { orderKeyboard } = require('../keyboard')
 
 const composer = new Composer()
 
 composer.hears('📦 Buyurtmalarim', async (ctx) => {
-	const {total, orders} = await orderController.orderList(ctx.from.id);
-	if (!orders) {
-		return ctx.reply("Siz hali hech narsa buyurtma qilmagansiz");
-	}
+    const { meals, total, users } = await orderController.listOrders({
+        telegramId: ctx.from.id.toString(),
+    })
 
-	await ctx.replyWithHTML(
-		`	
-			<b>Sizning buyurtmalaringiz:</b>\n\n${orders}\n<b>\nUmumiy summa:</b> ${total} so'm\n<b>Xizmat haqqi</b> (10%): ${total * 0.1} so'm\n\nJami: <b>${total + total * 0.1}</b> so'm
-		`,
-		{
-			reply_markup: orderKeyboard
-		},
-	);
-});
+    const serviceCharge = total * 0.1
 
+    if (meals.length === 0 || users.length === 0 || total === 0) {
+        return ctx.reply('*Hali hech kim buyurtma qilmagan*', {
+            parse_mode: 'Markdown',
+        })
+    }
+
+    const user = users[0]
+
+    const userOrders = meals
+        .map((meal) => `${meal.name} (*${meal.count}x*) - *${meal.total}* so'm`)
+        .join('\n')
+
+    ctx.reply(
+        `*${user.user_name} ${user?.user_phone}* buyurtmalar:\n\n${userOrders}\n\nJami: *${total}* so'm\nXizmat haqqi(10%) bilan: *${total + serviceCharge}* so'm`,
+        {
+            parse_mode: 'Markdown',
+        }
+    )
+})
 
 module.exports = composer
-
-
-

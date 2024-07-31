@@ -2,7 +2,7 @@ const { Composer } = require('telegraf')
 
 const mealController = require('../controllers/mealController')
 const orderController = require('../controllers/orderController')
-const { mealKeyboard, mainKeyboard } = require('../keyboard')
+const { editMealKeyboard, mealKeyboard, mainKeyboard } = require('../keyboard')
 
 const composer = new Composer()
 
@@ -30,13 +30,42 @@ composer.on('callback_query', async (ctx) => {
                     )
                 }
                 break
-            case 'order':
-                const count = data.c
+            case 'editOrder':
+                const editedOrder = await orderController.findOrderById(
+                    ctx.from.id
+                )
+                if (!editedOrder) {
+                    ctx.answerCbQuery(
+                        'Siz hali hech narsa buyurtma qilmagansiz',
+                        true
+                    )
+                    return
+                }
 
+                editedOrder.meals.forEach((meal) => {
+                    ctx.reply(
+                        `${meal.meal.name} *${meal.count}*x - *${meal.meal.price}* so'm`,
+                        {
+                            parse_mode: 'Markdown',
+                            reply_markup: editMealKeyboard(
+                                meal.meal._id,
+                                meal.count
+                            ),
+                        }
+                    )
+                })
+
+                break
+            case 'deleteOrder':
+                const deletedOrder = await orderController.deleteOrder(
+                    ctx.from.id
+                )
+                ctx.answerCbQuery(deletedOrder, true)
+            case 'order':
                 const result = await orderController.addMeal(
                     ctx.from.id,
-                    mealId,
-                    count
+                    data.m,
+                    data.c
                 )
 
                 ctx.answerCbQuery(result)
@@ -45,7 +74,7 @@ composer.on('callback_query', async (ctx) => {
                 // Inc the meal quantity
                 let incedCount = data.c + 1
                 await ctx.editMessageReplyMarkup(
-                    mealKeyboard(mealId, incedCount)
+                    mealKeyboard(data.m, incedCount)
                 )
                 break
             case 'dec':
@@ -53,17 +82,12 @@ composer.on('callback_query', async (ctx) => {
                 let decedCount = data.c - 1
                 if (decedCount < 1) decedCount = 1
                 await ctx.editMessageReplyMarkup(
-                    mealKeyboard(mealId, decedCount)
+                    mealKeyboard(data.m, decedCount)
                 )
                 break
             case 'orders':
-                const orders = await orderController.orderList(ctx.from.id)
-                ctx.reply(orders)
-                break
-
-            case 'orders':
                 const editOrders = await orderController.orderList(ctx.from.id)
-                ctx.reply(orders)
+                ctx.reply(editOrders)
                 break
             case 'applyOrder':
                 const resultOrder = await orderController.applyOrder(
@@ -75,62 +99,31 @@ composer.on('callback_query', async (ctx) => {
                 })
 
                 break
-            case 'editOrder':
-                const order = await orderController.findOrderById(ctx.from.id)
-                if (!order) {
-                    ctx.answerCbQuery(
-                        'Siz hali hech narsa buyurtma qilmagansiz',
-                        true
-                    )
-                    return
-                }
-                const total = order.meals.reduce(
-                    (acc, { meal: m, count }) => acc + m.price * count,
-                    0
-                )
-                const orderList = order.meals.map(
-                    ({ meal: m, count }) =>
-                        m.name +
-                        ' - ' +
-                        count +
-                        'x' +
-                        ' - ' +
-                        count * m.price +
-                        " so'm"
-                )
-                ctx.editMessageText(
-                    orderList.join(',\n') + '\n\nJami: ' + total + " so'm",
-                    {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [
-                                    {
-                                        text: 'Buyurtmani qabul qilish',
-                                        callback_data: JSON.stringify({
-                                            t: 'applyOrder',
-                                        }),
-                                    },
-                                    {
-                                        text: "Buyurtmani o'chirish",
-                                        callback_data: JSON.stringify({
-                                            t: 'cancelOrder',
-                                        }),
-                                    },
-                                ],
-                            ],
-                        },
-                    }
-                )
-                break
             case 'userOrder':
-                const {
-                    user,
-                    orders: userOrders,
-                    total: userTotal,
-                } = await orderController.userOrder(data.u)
-                const serviceCharge = userTotal * 0.1
+                const { meals, total, users } =
+                    await orderController.listOrders({
+                        telegramId: data.u,
+                    })
+
+                const serviceCharge = total * 0.1
+
+                if (meals.length === 0 || users.length === 0 || total === 0) {
+                    return ctx.reply('*Hali hech kim buyurtma qilmagan*', {
+                        parse_mode: 'Markdown',
+                    })
+                }
+
+                const user = users[0]
+
+                const userOrders = meals
+                    .map(
+                        (meal) =>
+                            `${meal.name} (*${meal.count}x*) - *${meal.total}* so'm`
+                    )
+                    .join('\n')
+
                 ctx.reply(
-                    `*${user.user_name} ${user?.user_phone}* buyurtmalar:\n\n${userOrders}\n\nJami: *${userTotal}* so'm\nXizmat haqqi(10%) bilan: *${userTotal + serviceCharge}* so'm`,
+                    `*${user.user_name} ${user?.user_phone}* buyurtmalar:\n\n${userOrders}\n\nJami: *${total}* so'm\nXizmat haqqi(10%) bilan: *${total + serviceCharge}* so'm`,
                     {
                         parse_mode: 'Markdown',
                     }
