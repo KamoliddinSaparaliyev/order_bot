@@ -114,14 +114,6 @@ module.exports = {
                         c: count,
                     }),
                 },
-                {
-                    text: '🛒 Saqlash',
-                    callback_data: JSON.stringify({
-                        t: 'saveOrder',
-                        m: mealId,
-                        c: count,
-                    }),
-                },
             ],
         ]
 
@@ -151,7 +143,7 @@ module.exports = {
                 {
                     text: "⛔ O'chrish",
                     callback_data: JSON.stringify({
-                        t: 'delete',
+                        t: 'deleteOrder',
                     }),
                 },
             ],

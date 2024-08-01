@@ -64,12 +64,6 @@ class OrderController {
                 { telegramId: userId, is_deleted: false, status: 'waiting' },
                 { $pull: { meals: { meal: mealId } } }
             )
-            // сохранение изменений
-            order.save()
-
-            return "Taom buyurtmangizdan o'chirildi"
-        } else {
-            return 'Bunday taom buyurtmangizda topilmadi'
         }
 
         // сохранение изменений
@@ -77,17 +71,16 @@ class OrderController {
 
     async deleteOrder(userId) {
         // получение заказа из БД
-        const order = await Order.findOne({
-            telegramId: userId,
-            is_deleted: false,
-            status: 'waiting',
-        })
+        const order = await Order.updateOne(
+            {
+                telegramId: userId,
+                is_deleted: false,
+                status: 'waiting',
+            },
+            { is_deleted: true }
+        )
 
-        // проверка на наличие заказа
         if (order) {
-            // удаление заказа
-            order.is_deleted = true
-            order.save()
             return 'Buyurtmangiz bekor qilindi'
         } else {
             return 'Siz hali hech narsa buyurtma qilmagansiz'
@@ -278,13 +271,20 @@ class OrderController {
             },
         ])
 
-        return { total: orders[0].totalSum, meals: orders[0].meals, users }
+        return { total: orders[0]?.totalSum, meals: orders[0]?.meals, users }
     }
 
     // update every 24 hours to delete orders older than 24 hours with node-cron
     async deleteOldOrders() {
         //  use soft delete to prevent
         await Order.updateMany({ is_deleted: false }, { is_deleted: true })
+    }
+    async updateOrderStatus() {
+        //  use soft delete to prevent
+        await Order.updateMany(
+            { status: 'waiting', is_deleted: false },
+            { status: 'done' }
+        )
     }
 }
 

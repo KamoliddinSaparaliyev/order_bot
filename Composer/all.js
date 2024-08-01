@@ -6,7 +6,11 @@ const { getCurrentDate } = require('../utils')
 const composer = new Composer()
 
 composer.hears('📝 Barcha buyurtmalar', async (ctx) => {
-    const { meals, total, users } = await orderController.listOrders()
+    const {
+        meals = [],
+        total = 0,
+        users = [],
+    } = await orderController.listOrders()
     const serviceCharge = total * 0.1
 
     if (meals.length === 0 || users.length === 0 || total === 0) {

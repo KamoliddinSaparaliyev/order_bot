@@ -18,7 +18,6 @@ const bot = new Telegraf(token, {
 bot.use(session({ store }))
 
 bot.use(require('./Composer/start'))
-bot.use(require('./Composer/contact'))
 bot.use(require('./Composer/back'))
 bot.use(require('./Composer/all'))
 bot.use(require('./Composer/meal'))

@@ -3,23 +3,26 @@ const { Composer } = require('telegraf')
 const mealController = require('../controllers/mealController')
 const orderController = require('../controllers/orderController')
 const { editMealKeyboard, mealKeyboard, mainKeyboard } = require('../keyboard')
+const { getCurrentDate, getImgPath } = require('../utils')
+const { GET_USER_ORDER } = require('../actions')
 
 const composer = new Composer()
 
 composer.on('callback_query', async (ctx) => {
     try {
         let data = JSON.parse(ctx.callbackQuery.data)
-        console.log(data)
-        const mealId = data.m
-        const meal = await mealController.findMealById(mealId)
 
         switch (data.t) {
             case 'meal':
+                const mealId = data.m
+                const meal = await mealController.findMealById(mealId)
                 if (!meal) {
                     return ctx.replyWithHTML('<b> Bunday ovqat topilmadi! </b>')
                 } else {
+                    const imgPath = getImgPath(meal.img)
+
                     await ctx.replyWithPhoto(
-                        { url: meal.img },
+                        { filename: meal.img, source: imgPath },
                         {
                             caption: `
 							*${meal.name} ${meal.price}*
@@ -29,6 +32,7 @@ composer.on('callback_query', async (ctx) => {
                         }
                     )
                 }
+                ctx.answerCbQuery()
                 break
             case 'editOrder':
                 const editedOrder = await orderController.findOrderById(
@@ -54,21 +58,23 @@ composer.on('callback_query', async (ctx) => {
                         }
                     )
                 })
-
+                ctx.answerCbQuery()
                 break
             case 'deleteOrder':
                 const deletedOrder = await orderController.deleteOrder(
                     ctx.from.id
                 )
-                ctx.answerCbQuery(deletedOrder, true)
-            case 'order':
-                const result = await orderController.addMeal(
-                    ctx.from.id,
-                    data.m,
-                    data.c
-                )
 
-                ctx.answerCbQuery(result)
+                ctx.deleteMessage()
+                ctx.answerCbQuery(deletedOrder, true, {
+                    reply_markup: mainKeyboard,
+                })
+                break
+            case 'order':
+                await orderController.addMeal(ctx.from.id, data.m, data.c)
+                await ctx.editMessageReplyMarkup(
+                    editMealKeyboard(data.m, data.c)
+                )
                 break
             case 'inc':
                 // Inc the meal quantity
@@ -85,9 +91,10 @@ composer.on('callback_query', async (ctx) => {
                     mealKeyboard(data.m, decedCount)
                 )
                 break
-            case 'orders':
-                const editOrders = await orderController.orderList(ctx.from.id)
-                ctx.reply(editOrders)
+            case 'cancelOrder':
+                await orderController.removeMeal(ctx.from.id, data.m)
+                await ctx.editMessageReplyMarkup(mealKeyboard(data.m, data.c))
+                ctx.answerCbQuery()
                 break
             case 'applyOrder':
                 const resultOrder = await orderController.applyOrder(
@@ -100,34 +107,10 @@ composer.on('callback_query', async (ctx) => {
 
                 break
             case 'userOrder':
-                const { meals, total, users } =
-                    await orderController.listOrders({
-                        telegramId: data.u,
-                    })
-
-                const serviceCharge = total * 0.1
-
-                if (meals.length === 0 || users.length === 0 || total === 0) {
-                    return ctx.reply('*Hali hech kim buyurtma qilmagan*', {
-                        parse_mode: 'Markdown',
-                    })
-                }
-
-                const user = users[0]
-
-                const userOrders = meals
-                    .map(
-                        (meal) =>
-                            `${meal.name} (*${meal.count}x*) - *${meal.total}* so'm`
-                    )
-                    .join('\n')
-
-                ctx.reply(
-                    `*${user.user_name} ${user?.user_phone}* buyurtmalar:\n\n${userOrders}\n\nJami: *${total}* so'm\nXizmat haqqi(10%) bilan: *${total + serviceCharge}* so'm`,
-                    {
-                        parse_mode: 'Markdown',
-                    }
-                )
+                await GET_USER_ORDER(ctx, {
+                    telegramId: data.u,
+                })
+                ctx.answerCbQuery()
                 break
             default:
                 ctx.answerCbQuery('Unknown action')
