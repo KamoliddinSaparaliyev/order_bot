@@ -112,7 +112,7 @@ module.exports = {
         keyboard: [
             [
                 {
-                    text: '🎲 Random',
+                    text: '🔄 Qayta',
                     callback_data: JSON.stringify({
                         t: 'random',
                     }),

@@ -1,10 +1,15 @@
 const { Composer } = require('telegraf')
+
 const orderController = require('../controllers/orderController')
 const { randomKeyboard } = require('../keyboard')
 
 const composer = new Composer()
 
-composer.hears('🎲 Random', async (ctx) => {
+composer.hears('🎲 Random', async (ctx) => await random(ctx))
+composer.hears('🔄 Qayta', async (ctx) => await random(ctx))
+composer.command('random', async (ctx) => await random(ctx))
+
+async function random(ctx) {
     const { users } = await orderController.listOrders()
 
     const randomUser = users[Math.floor(Math.random() * users.length)]
@@ -14,6 +19,6 @@ composer.hears('🎲 Random', async (ctx) => {
             reply_markup: randomKeyboard,
         }
     )
-})
+}
 
 module.exports = composer
