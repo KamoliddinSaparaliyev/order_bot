@@ -3,7 +3,7 @@ const { Composer } = require('telegraf')
 const mealController = require('../controllers/mealController')
 const orderController = require('../controllers/orderController')
 const { editMealKeyboard, mealKeyboard, mainKeyboard } = require('../keyboard')
-const { getCurrentDate, getImgPath } = require('../utils')
+const { getImgPath } = require('../utils')
 const { GET_USER_ORDER } = require('../actions')
 
 const composer = new Composer()

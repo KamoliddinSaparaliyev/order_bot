@@ -5,7 +5,10 @@ const { getCurrentDate } = require('../utils')
 
 const composer = new Composer()
 
-composer.hears('📝 Barcha buyurtmalar', async (ctx) => {
+composer.hears('📝 Barcha buyurtmalar', async (ctx) => await allOrders(ctx))
+composer.command('allorders', async (ctx) => await allOrders(ctx))
+
+async function allOrders(ctx) {
     const {
         meals = [],
         total = 0,
@@ -42,6 +45,6 @@ composer.hears('📝 Barcha buyurtmalar', async (ctx) => {
             },
         }
     )
-})
+}
 
 module.exports = composer
