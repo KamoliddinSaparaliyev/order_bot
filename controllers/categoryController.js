@@ -5,7 +5,6 @@ require('../models/category.model')
 const Category = mongoose.model('category')
 
 class CategoryController {
-    // Поиск блюда по uuid
     async findCategoryById(category) {
         return await Category.findOne({ _id: category }).populate('meals')
     }
@@ -18,12 +17,8 @@ class CategoryController {
         return await Category.findOne({ name: name })
     }
 
-    // Формирование клавиатуры с типами блюд
     async replyCategoryKeyboard() {
-        // получение полного списка блюд
         const categories = await Category.find({})
-
-        // categories reply keyboard
 
         const keyBoard = []
 

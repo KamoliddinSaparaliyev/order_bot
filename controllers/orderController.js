@@ -2,10 +2,8 @@ const cron = require('node-cron')
 const Order = require('../models/order.model')
 
 class OrderController {
-    // добавление блюда в заказ
     async addMeal(userId, mealId, count) {
         try {
-            // Define the query to find the order
             const query = {
                 telegramId: userId,
                 is_deleted: false,
@@ -47,9 +45,7 @@ class OrderController {
         }
     }
 
-    // удаление блюда из заказа
     async removeMeal(userId, mealId) {
-        // получение заказа из БД
         const order = await Order.exists({
             telegramId: userId,
             is_deleted: false,
@@ -57,20 +53,15 @@ class OrderController {
             meals: { $elemMatch: { meal: mealId } },
         })
 
-        // поиск блюда в списке заказанных
         if (order) {
-            // удаление блюда из заказа
             await Order.updateOne(
                 { telegramId: userId, is_deleted: false, status: 'waiting' },
                 { $pull: { meals: { meal: mealId } } }
             )
         }
-
-        // сохранение изменений
     }
 
     async deleteOrder(userId) {
-        // получение заказа из БД
         const order = await Order.updateOne(
             {
                 telegramId: userId,
@@ -87,7 +78,6 @@ class OrderController {
         }
     }
 
-    // поиск заказа по id пользователя
     async findOrderById(userId) {
         return Order.findOne({
             telegramId: userId,
@@ -96,7 +86,6 @@ class OrderController {
         }).populate('meals.meal user')
     }
 
-    // подтверждение заказа
     async applyOrder(userId) {
         const order = await Order.findOne({
             telegramId: userId,
@@ -105,7 +94,6 @@ class OrderController {
         })
         let msg = 'Siz hali hech narsa buyurtma qilmagansiz'
 
-        // проверка на наличие заказа
         if (order) {
             order.status = 'done'
             order.save()
@@ -115,20 +103,13 @@ class OrderController {
         }
     }
 
-    // заказ пользователя для менеджера
     async orderList(userId) {
-        // получение заказа из БД
         const order = await Order.findOne({
             telegramId: userId,
             is_deleted: false,
             status: 'waiting',
         }).populate('meals.meal')
-        const msg = 'Siz hali hech narsa buyurtma qilmagansiz'
 
-        if (!order) {
-            return msg
-        }
-        //
         const total = await Order.aggregate([
             {
                 $match: {
@@ -161,7 +142,6 @@ class OrderController {
             },
         ])
 
-        // формирование списка заказа
         const orderList = order.meals.map(
             ({ meal: m, count }) =>
                 m.name + ' - ' + count + 'x' + ' - ' + count * m.price + " so'm"
@@ -274,13 +254,11 @@ class OrderController {
         return { total: orders[0]?.totalSum, meals: orders[0]?.meals, users }
     }
 
-    // update every 24 hours to delete orders older than 24 hours with node-cron
     async deleteOldOrders() {
-        //  use soft delete to prevent
         await Order.updateMany({ is_deleted: false }, { is_deleted: true })
     }
+
     async updateOrderStatus() {
-        //  use soft delete to prevent
         await Order.updateMany(
             { status: 'waiting', is_deleted: false },
             { status: 'done' }

@@ -1,20 +1,4 @@
 module.exports = {
-    simpleKeybaord: {
-        keyboard: [
-            [
-                {
-                    text: 'Ha ✅',
-                    callback_data: 'uz',
-                },
-                {
-                    text: "Yo'q ❌",
-                    callback_data: 'en',
-                },
-            ],
-        ],
-        resize_keyboard: true,
-    },
-
     mainKeyboard: {
         keyboard: [
             [
@@ -28,6 +12,9 @@ module.exports = {
             [
                 {
                     text: '📝 Barcha buyurtmalar',
+                },
+                {
+                    text: '🎲 Random',
                 },
             ],
         ],
@@ -120,6 +107,27 @@ module.exports = {
         return {
             inline_keyboard,
         }
+    },
+    randomKeyboard: {
+        keyboard: [
+            [
+                {
+                    text: '🎲 Random',
+                    callback_data: JSON.stringify({
+                        t: 'random',
+                    }),
+                },
+            ],
+            [
+                {
+                    text: '⬅️ Orqaga',
+                    callback_data: JSON.stringify({
+                        t: 'menu',
+                    }),
+                },
+            ],
+        ],
+        resize_keyboard: true,
     },
 
     // Клавиатура для заказа

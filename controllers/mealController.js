@@ -5,19 +5,15 @@ require('../models/meal.model')
 const Meal = mongoose.model('meal')
 
 class MealController {
-    // Поиск блюда по uuid
     async findMealById(id) {
         return await Meal.findOne({ _id: id })
     }
 
-    // Поиск блюд по типу
     async findMealsByCategory(category) {
         return await Meal.find({ category: category })
     }
 
-    // Формирование клавиатуры с типами блюд
     async inlineMealKeyboard(categoryId) {
-        // получение полного списка блюд
         const meals = await Meal.find({ category: categoryId })
 
         const keyBoard = meals.map((m) => [
