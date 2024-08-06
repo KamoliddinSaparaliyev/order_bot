@@ -1,4 +1,3 @@
-const mongoose = require('mongoose')
 const { Telegraf, session } = require('telegraf')
 const { task } = require('./utils')
 require('dotenv').config()
@@ -27,5 +26,5 @@ bot.catch((err, ctx) => {
 
 db.connection.once('open', async () => {
     task.start()
-    bot.launch()
+    await bot.launch()
 })
